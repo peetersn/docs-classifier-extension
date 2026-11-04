@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Google Docs Banner Hider",
-  "version": "2.1.0",
-  "description": "Automatically hides Google Docs Data Classification banners after 3 seconds",
+  "version": "2.3.0",
+  "description": "Hides Google Docs Data Classification banners and the Google Slides \"Enhance this slide\" AI nudge",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -18,9 +18,20 @@
       "js": [
         "utils.js",
         "observer.js",
-        "content.js"
+        "content.js",
+        "slides-nudge.js"
       ],
       "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://docs.google.com/presentation/*"
+      ],
+      "css": [
+        "slides-nudge.css"
+      ],
+      "run_at": "document_start",
       "all_frames": false
     }
   ]

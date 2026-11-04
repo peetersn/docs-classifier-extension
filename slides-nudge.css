@@ -1,0 +1,12 @@
+/* slides-nudge.css
+ * Hides the Google Slides "Enhance this slide" AI nudge before it renders.
+ * Injected by the manifest before the DOM is built, so there is no flash.
+ * Keep in sync with NUDGE_SELECTOR in slides-nudge.js.
+ */
+#canvas-nudge-surface-soy-container,
+[id^="canvas-nudge-surface"],
+[class*="CanvasNudgeSurface"],
+[class*="appsElementsGenerativeAiNudge"],
+[aria-label="Enhance this slide"]:not(button):not([role="button"]):not([role="menuitem"]) {
+  display: none !important;
+}

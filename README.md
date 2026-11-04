@@ -1,6 +1,6 @@
 # Google Docs Banner Hider
 
-A Chrome extension that automatically hides Google Docs Data Classification banners.
+A Chrome extension that automatically hides Google Docs Data Classification banners and the Google Slides "Enhance this slide" AI nudge.
 
 ## Overview
 
@@ -14,6 +14,7 @@ This extension monitors Google Docs, Sheets, and Presentations for Data Classifi
 - Works across Google Docs, Sheets, and Presentations
 - Minimal performance impact using efficient DOM observation
 - Debug logging for troubleshooting
+- Google Slides: hides the "Enhance this slide" AI nudge and clicks its native dismiss button
 
 ## Installation
 
@@ -72,14 +73,23 @@ If you don't have access to classification banners:
 The extension consists of three main components:
 
 1. **utils.js**: Helper functions for logging and delays
-2. **observer.js**: MutationObserver that watches for classification banners appearing in the DOM
+2. **observer.js**: One shared MutationObserver per page. Feature modules register a check with `DocsClassifierObserver.register(name, fn)`; all checks run together, at most once every 250ms, and only when elements were added
 3. **content.js**: Main logic that handles banner detection and hiding
+4. **slides-nudge.js / slides-nudge.css**: Google Slides "Enhance this slide" nudge (see below)
 
 ### Detection Strategy
 
-- Uses MutationObserver to watch for new elements added to the page
-- Checks for elements with the ID `docs-feature-level-banner`
-- Handles both existing banners on page load and dynamically added banners
+- Registers a check with the shared observer, which runs when new elements are added to the page
+- Looks up the element with the ID `docs-feature-level-banner` (`getElementById`, very cheap)
+- Handles both existing banners on page load and dynamically added banners; each banner element is only handled once
+
+### Google Slides "Enhance this slide" Nudge
+
+On `docs.google.com/presentation/*` only:
+
+1. `slides-nudge.css` is injected at `document_start` and sets `display: none` on the nudge containers, so it never flashes on screen.
+2. `slides-nudge.js` registers a check with the shared observer and clicks the nudge's own dismiss button so Slides runs its native dismiss logic. A button is only clicked if it sits inside a nudge container, so unrelated "Close" buttons are never touched.
+3. If the nudge is present but no dismiss button matches, a `[DocsClassifier]` warning is logged (at most every 30s): Google probably changed the markup. Update the selectors in **both** `slides-nudge.css` and `slides-nudge.js`.
 
 ### Hiding Process
 
@@ -113,7 +123,7 @@ The extension consists of three main components:
 2. **Inspect Banner DOM**:
    - Right-click on the classification banner → Inspect
    - Verify it has the ID `docs-feature-level-banner`
-   - If the ID is different, update the code in `content.js` and `observer.js`
+   - If the ID is different, update the ID in `content.js`
 
 ### Google Docs URL Not Matched
 
@@ -150,7 +160,7 @@ Debug logging is enabled by default. To disable:
 Key files to modify:
 
 - **content.js**: Change the delay time (currently 3 seconds) or the target class name
-- **observer.js**: Update the banner detection logic if the class name changes
+- **observer.js**: Shared observer; change `THROTTLE_MS` to tune how often checks run
 - **utils.js**: Adjust timing delays
 - **manifest.json**: Change matched URLs or add permissions
 
@@ -169,8 +179,10 @@ After making changes:
 tools/docs-classifier-extension/
 ├── manifest.json          # Manifest V3 configuration
 ├── content.js             # Main logic for hiding banners
-├── observer.js            # MutationObserver for banner detection
+├── observer.js            # Shared, throttled MutationObserver
 ├── utils.js               # Helper utilities
+├── slides-nudge.css       # Hides the Slides "Enhance this slide" nudge
+├── slides-nudge.js        # Clicks the nudge's native dismiss button
 ├── icons/
 │   ├── icon16.png        # 16x16 extension icon (placeholder)
 │   ├── icon48.png        # 48x48 extension icon (placeholder)
@@ -211,4 +223,6 @@ Created for internal use. Modify as needed.
 
 ## Version
 
-Current version: **2.1.0** - Added smooth fade-out transition
+Current version: **2.3.0** - Single shared, throttled MutationObserver for all features
+
+- 2.2.0 - Hide the Google Slides "Enhance this slide" AI nudge

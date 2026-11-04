@@ -31,34 +31,28 @@
     }
   }
 
-  // Check for existing banner on page load
-  async function checkExistingBanner() {
-    log('Checking for existing classification banner...');
+  // Banners already handled (hidden or being hidden). The inline
+  // display:none stays on the element, so it never needs handling twice.
+  const handledBanners = new WeakSet();
 
-    await delay(1000); // Wait for Google Docs to fully initialize
-
-    const banner = document.querySelector('#docs-feature-level-banner');
-    if (banner) {
-      log('Found existing banner on page load');
-      await handleClassificationBanner(banner);
-    } else {
-      log('No existing banner found');
+  // Run by the shared observer whenever elements are added
+  function checkClassificationBanner() {
+    const banner = document.getElementById('docs-feature-level-banner');
+    if (banner && !handledBanners.has(banner)) {
+      handledBanners.add(banner);
+      handleClassificationBanner(banner);
     }
   }
 
   // Initialize
-  async function init() {
+  function init() {
     log('Google Docs Banner Hider initialized');
-    log('Version: 2.1.0');
+    log('Version: 2.3.0');
     log('Watching for classification banners...');
 
-    // Set up handler for observer
-    window.handleClassificationBanner = handleClassificationBanner;
+    window.DocsClassifierObserver.register('classification-banner', checkClassificationBanner);
 
-    // Check for banner already on page
-    await checkExistingBanner();
-
-    // Start watching for new banners
+    // Start watching; also checks for a banner already on the page
     window.DocsClassifierObserver.start();
 
     log('Ready to hide classification banners');
