@@ -1,58 +1,56 @@
 // observer.js
-// MutationObserver logic to detect when classification banners appear
+// Shared MutationObserver. Feature modules register a check function; all
+// checks run together, throttled, whenever elements are added to the page.
+// One observer per page instead of one per feature.
 
 (function() {
-  const { log, warn } = window.DocsClassifierUtils;
+  const { log, error } = window.DocsClassifierUtils;
 
+  const THROTTLE_MS = 250; // Coalesce mutation bursts into one pass
+
+  const checks = [];
   let observer = null;
-  let processingBanner = false;
+  let scanScheduled = false;
 
-  // Callback when mutations are detected
-  function onMutation(mutations) {
-    // Prevent re-entrant processing
-    if (processingBanner) {
-      return;
-    }
-
-    // Check if any added nodes contain classification banner
-    for (const mutation of mutations) {
-      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        for (const node of mutation.addedNodes) {
-          // Skip text nodes
-          if (node.nodeType !== Node.ELEMENT_NODE) {
-            continue;
-          }
-
-          // Check if this node or its descendants is a classification banner
-          const banner = findClassificationBanner(node);
-          if (banner) {
-            log('Classification banner detected!', banner);
-            processingBanner = true;
-            handleClassificationBanner(banner)
-              .finally(() => {
-                processingBanner = false;
-              });
-            return; // Process one at a time
-          }
-        }
-      }
+  function runCheck({ name, check }) {
+    try {
+      check();
+    } catch (e) {
+      error(`Check "${name}" failed:`, e);
     }
   }
 
-  // Find classification banner in node tree
-  function findClassificationBanner(node) {
-    // Check the node itself for the specific ID
-    if (node.matches && node.id === 'docs-feature-level-banner') {
-      return node;
+  function runChecks() {
+    scanScheduled = false;
+    checks.forEach(runCheck);
+  }
+
+  // Callback when mutations are detected
+  function onMutation(mutations) {
+    if (scanScheduled) {
+      return;
     }
 
-    // Check descendants for the specific ID
-    const banner = node.querySelector('#docs-feature-level-banner');
-    if (banner) {
-      return banner;
+    // Docs mutates the DOM constantly while editing; only scan when
+    // elements were actually added.
+    const addedElement = mutations.some(m =>
+      Array.prototype.some.call(m.addedNodes, n => n.nodeType === Node.ELEMENT_NODE));
+    if (!addedElement) {
+      return;
     }
 
-    return null;
+    scanScheduled = true;
+    setTimeout(runChecks, THROTTLE_MS);
+  }
+
+  // Register a check. Safe to call before or after start().
+  function register(name, check) {
+    const entry = { name, check };
+    checks.push(entry);
+    log(`Registered check: ${name}`);
+    if (observer) {
+      runCheck(entry);
+    }
   }
 
   // Start observing
@@ -75,6 +73,9 @@
     });
 
     log('MutationObserver started');
+
+    // Catch anything already on the page
+    runChecks();
   }
 
   // Stop observing (for cleanup)
@@ -88,10 +89,8 @@
 
   // Export
   window.DocsClassifierObserver = {
+    register,
     start: startObserver,
     stop: stopObserver
   };
-
-  // Handler will be defined in content.js
-  window.handleClassificationBanner = null;
 })();
